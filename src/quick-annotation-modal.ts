@@ -15,7 +15,7 @@ export class QuickAnnotationModal extends Modal {
     app: App,
     private readonly targetText: string,
     private readonly initialSpec: AnnotationSpec,
-    private readonly onSubmit: (spec: AnnotationSpec) => void,
+    private readonly onSubmit: (spec: AnnotationSpec) => boolean | void,
   ) {
     super(app);
     this.noteValue = initialSpec.note;
@@ -49,7 +49,7 @@ export class QuickAnnotationModal extends Modal {
           });
         text.inputEl.addClass("crisp-ann-quick-modal__input");
         text.inputEl.addEventListener("keydown", (evt: KeyboardEvent) => {
-          if (evt.key === "Enter") {
+          if (evt.key === "Enter" && !evt.isComposing && evt.keyCode !== 229) {
             evt.preventDefault();
             this.submit();
           }
@@ -91,8 +91,11 @@ export class QuickAnnotationModal extends Modal {
       ...this.initialSpec,
       note,
     };
+    if (this.onSubmit(finalSpec) === false) {
+      if (this.errorEl) this.errorEl.textContent = "文档已变化，未写入标注。请复制笔记后重新选择目标。";
+      return;
+    }
     this.close();
-    this.onSubmit(finalSpec);
   }
 
   private clearError(): void {

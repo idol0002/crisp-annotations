@@ -553,6 +553,20 @@ export default class CrispAnnotationsPlugin extends Plugin {
     return true;
   }
 
+  // Modal coordinates are only valid for the document snapshot that opened it.
+  private annotationWriteGuard(editor: Editor, source: string): () => boolean {
+    const leaf = this.app.workspace.getLeavesOfType("markdown").find((candidate) => (
+      (candidate.view as { editor?: Editor }).editor === editor
+    ));
+    const filePath = (leaf?.view as { file?: TFile } | undefined)?.file?.path;
+    return () => {
+      const current = leaf?.view as { editor?: Editor; file?: TFile } | undefined;
+      return editor.getValue() === source && (!leaf || (
+        current?.editor === editor && current?.file?.path === filePath
+      ));
+    };
+  }
+
   private async openAnnotationModal(editor: Editor): Promise<void> {
     if (!(await this.ensureLicenseActivated())) return;
     const source = editor.getValue();
@@ -590,6 +604,7 @@ export default class CrispAnnotationsPlugin extends Plugin {
     const trimmedFrom = editor.offsetToPos(editor.posToOffset(from) + leadingTrim);
     const trimmedTo = editor.offsetToPos(editor.posToOffset(to) - trailingTrim);
 
+    const canWrite = this.annotationWriteGuard(editor, source);
     new AnnotationModal(
       this.app,
       initial,
@@ -600,9 +615,10 @@ export default class CrispAnnotationsPlugin extends Plugin {
         settings?.open();
         settings?.openTabById(this.manifest.id);
       },
-      async (spec) => {
+      (spec) => {
+        if (!canWrite()) return false;
         editor.replaceRange(serializeAnnotation(target, spec), trimmedFrom, trimmedTo);
-        await this.saveSettings();
+        void this.saveSettings();
       },
     ).open();
   }
@@ -867,7 +883,8 @@ export default class CrispAnnotationsPlugin extends Plugin {
     openIfNeeded: boolean,
   ): Promise<{ editor: Editor; leaf: WorkspaceLeaf } | null> {
     const sourceEditor = (context.sourceLeaf?.view as { editor?: Editor } | undefined)?.editor;
-    if (context.sourceLeaf && sourceEditor) {
+    const sourcePath = (context.sourceLeaf?.view as { file?: TFile } | undefined)?.file?.path;
+    if (context.sourceLeaf && sourceEditor && (!context.filePath || sourcePath === context.filePath)) {
       return { editor: sourceEditor, leaf: context.sourceLeaf };
     }
     if (!context.filePath) {
@@ -1030,11 +1047,13 @@ export default class CrispAnnotationsPlugin extends Plugin {
     const trimmedFrom = editor.offsetToPos(editor.posToOffset(from) + leadingTrim);
     const trimmedTo = editor.offsetToPos(editor.posToOffset(to) - trailingTrim);
 
+    const canWrite = this.annotationWriteGuard(editor, source);
     new QuickAnnotationModal(
       this.app,
       target,
       spec,
       (finalSpec) => {
+        if (!canWrite()) return false;
         editor.replaceRange(serializeAnnotation(target, finalSpec), trimmedFrom, trimmedTo);
         if (this.settings.rememberLastChoice) {
           this.settings.lastUsedPlace = finalSpec.place;

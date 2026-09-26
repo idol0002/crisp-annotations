@@ -46,3 +46,24 @@ describe("QuickAnnotationModal", () => {
     );
   });
 });
+
+it.each([{ isComposing: true }, { keyCode: 229 }])('does not submit an IME confirmation Enter (%o)', (ime) => {
+  const submit = vi.fn();
+  const modal = new QuickAnnotationModal(createApp(), '目标', { ...SPEC, note: '中文' }, submit);
+  modal.onOpen();
+  const input = modal.contentEl.querySelector('input')!;
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...ime }));
+  expect(submit).not.toHaveBeenCalled();
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  expect(submit).toHaveBeenCalledOnce();
+});
+
+it('retains the note when the document rejects a stale submission', () => {
+  const modal = new QuickAnnotationModal(createApp(), '目标', { ...SPEC, note: '保留草稿' }, () => false);
+  const close = vi.spyOn(modal, 'close');
+  modal.onOpen();
+  modal.contentEl.querySelector<HTMLButtonElement>('.mod-cta')!.click();
+  expect(close).not.toHaveBeenCalled();
+  expect(modal.contentEl.querySelector<HTMLInputElement>('input')!.value).toBe('保留草稿');
+  expect(modal.contentEl.textContent).toContain('文档');
+});

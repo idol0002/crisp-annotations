@@ -42,7 +42,7 @@ export class VaultAnnotationIndex {
         try {
           await this.update(file);
         } catch {
-          this.remove(file.path);
+          // update handles only its own failed revision.
         }
       }));
     }
@@ -51,7 +51,14 @@ export class VaultAnnotationIndex {
   async update(file: VaultMarkdownFile, source?: string): Promise<void> {
     const revision = (this.revisions.get(file.path) ?? 0) + 1;
     this.revisions.set(file.path, revision);
-    const resolvedSource = source ?? await this.readFile(file);
+    let resolvedSource: string;
+    try {
+      resolvedSource = source ?? await this.readFile(file);
+    } catch (error) {
+      if (this.revisions.get(file.path) !== revision) return;
+      this.remove(file.path);
+      throw error;
+    }
     if (this.revisions.get(file.path) !== revision) {
       return;
     }

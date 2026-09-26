@@ -152,3 +152,12 @@ describe("radio modal regressions", () => {
     modal.onClose();
   });
 });
+
+it('keeps an edited note available when the document rejects the write', () => {
+  const modal = new AnnotationModal({} as App, {note:'保留草稿',place:'right',color:'blue',mark:true}, true, {...DEFAULT_SETTINGS}, vi.fn(), () => false);
+  const close = vi.spyOn(modal, 'close');
+  modal.onOpen();
+  modal.contentEl.querySelector<HTMLButtonElement>('.crisp-radio-btn--submit')!.click();
+  expect(close).not.toHaveBeenCalled();
+  expect(modal.contentEl.textContent).toContain('文档');
+});

@@ -696,3 +696,32 @@ describe("annotation outline lifecycle", () => {
     expect(refresh).toHaveBeenLastCalledWith(SOURCE, markdownLeaf);
   });
 });
+
+it('refuses modal writes after the source changes while the dialog is open', async () => {
+  const { app, markdownLeaf, getSource } = createWorkspace();
+  const plugin = new CrispAnnotationsPlugin(app, { id: 'crisp-annotations' } as never);
+  plugin.app = app;
+  vi.spyOn(plugin, 'ensureLicenseActivated').mockResolvedValue(true);
+  vi.spyOn(plugin, 'saveSettings').mockResolvedValue();
+  const editor = (markdownLeaf.view as unknown as MarkdownViewShape).editor;
+  editor.setCursor({ line: 0, ch: 7 });
+  const opened: AnnotationModal[] = [];
+  const spy = vi.spyOn(AnnotationModal.prototype, 'open').mockImplementation(function(this: AnnotationModal) { opened.push(this); });
+  try {
+    await (plugin as unknown as {openAnnotationModal(e: unknown): Promise<void>}).openAnnotationModal(editor);
+    editor.replaceRange('外部新增正文 ', { line: 0, ch: 0 });
+    const changed = getSource();
+    (opened[0] as unknown as {onSubmit(s: unknown): void}).onSubmit({ note: '新批注', color: 'blue', place: 'right', mark: true });
+    expect(getSource()).toBe(changed);
+  } finally { spy.mockRestore(); }
+});
+
+it('does not reuse an outline source leaf after it has switched to another file', async () => {
+  const { app, markdownLeaf } = createWorkspace();
+  const plugin = new CrispAnnotationsPlugin(app, { id: 'crisp-annotations' } as never);
+  plugin.app = app;
+  const view = markdownLeaf.view as unknown as MarkdownViewShape;
+  view.file = { ...view.file, path: 'Other.md' };
+  const result = await (plugin as unknown as {getOutlineEditorContext(c: unknown, open: boolean): Promise<unknown>}).getOutlineEditorContext({ sourceLeaf: markdownLeaf, filePath: 'Current.md' }, false);
+  expect(result).toBeNull();
+});

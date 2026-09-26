@@ -107,3 +107,14 @@ describe("filterVaultAnnotationEntries", () => {
     expect(filterVaultAnnotationEntries(entries, "phosphor", "blue")).toHaveLength(0);
   });
 });
+
+it('preserves a newer editor update when an earlier rebuild read rejects', async () => {
+  let rejectRead!: (error: Error) => void;
+  const index = new VaultAnnotationIndex(() => new Promise((_resolve, reject) => { rejectRead = reject; }));
+  const target = file('Draft.md');
+  const building = index.rebuild([target]);
+  await index.update(target, '==New=={ann note="editor"}');
+  rejectRead(new Error('stale disk failure'));
+  await building;
+  expect(index.getEntries().map(entry => entry.annotation.spec.note)).toEqual(['editor']);
+});

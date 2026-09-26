@@ -103,7 +103,7 @@ export class AnnotationModal extends Modal {
     private readonly editing: boolean,
     private readonly settings: CrispAnnotationsSettings,
     private readonly onOpenSettings: () => void,
-    private readonly onSubmit: (spec: AnnotationSpec) => void,
+    private readonly onSubmit: (spec: AnnotationSpec) => boolean | void,
   ) {
     super(app);
     this.draft = { ...initial };
@@ -508,7 +508,10 @@ export class AnnotationModal extends Modal {
       this.settings.lastUsedMark = this.draft.mark;
     }
     if (this.draft.color === "custom") this.settings.customColor = this.customColor;
-    this.onSubmit({ ...this.draft, note });
+    if (this.onSubmit({ ...this.draft, note }) === false) {
+      this.setError("文档已变化，未写入标注。请复制笔记后重新选择目标。");
+      return;
+    }
     this.close();
   }
 }
