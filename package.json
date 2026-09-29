@@ -9,7 +9,8 @@
     "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
     "test": "vitest run && node --test tests/license-http.mjs",
     "lint": "eslint src tests *.ts *.mjs --no-error-on-unmatched-pattern",
-    "check": "npm run test && npm run lint && npm run build"
+    "check": "npm run test && npm run lint && npm run build",
+    "deploy": "node scripts/deploy.mjs"
   },
   "keywords": [
     "obsidian",
