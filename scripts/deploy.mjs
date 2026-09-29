@@ -4,7 +4,7 @@ import process from "node:process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Runtime whitelist. data.json (settings + license code) is never copied.
+// Runtime whitelist. data.json (user settings) is never copied.
 const requiredFiles = ["main.js", "manifest.json", "styles.css"];
 const optionalFiles = ["LICENSE", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md"];
 const optionalDirectories = ["assets", "audio"];

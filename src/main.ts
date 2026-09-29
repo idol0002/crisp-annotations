@@ -40,7 +40,6 @@ import {
   type OutlineAnnotationAction,
   type OutlineAnnotationContext,
 } from "./outline-view";
-import { verifyLicenseCode } from "./license";
 import {
   renderAnnotationsInElement,
   resetAnnotationMaskState,
@@ -105,7 +104,6 @@ export default class CrispAnnotationsPlugin extends Plugin {
   private readonly readingScrollDocuments = new Set<Document>();
   private readonly readingSyncFrames = new Map<Document, number>();
   private readonly readingSourceIndexes = new WeakMap<Editor, ReadingSourceIndex>();
-  private licenseCacheValid = false;
 
   async onload(): Promise<void> {
     registerIcons();
@@ -344,7 +342,6 @@ export default class CrispAnnotationsPlugin extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
-    this.licenseCacheValid = false;
     await this.saveData(this.settings);
     this.applyAppearanceSettings();
     this.marginLayout.refreshAll();
@@ -561,19 +558,6 @@ export default class CrispAnnotationsPlugin extends Plugin {
   }
 
   async ensureLicenseActivated(): Promise<boolean> {
-    if (!this.settings.licenseCode) {
-      new Notice("🔒 Crisp Annotations 未激活，请先在插件设置中激活 Crisp 授权。");
-      return false;
-    }
-    if (this.licenseCacheValid) {
-      return true;
-    }
-    const check = await verifyLicenseCode(this.settings.licenseCode, "crisp-annotations", true);
-    if (!check.valid) {
-      new Notice(`🔒 Crisp Annotations 授权无效: ${check.reason || "未激活"}`);
-      return false;
-    }
-    this.licenseCacheValid = true;
     return true;
   }
 
@@ -1202,55 +1186,6 @@ class CrispAnnotationsSettingTab extends PluginSettingTab {
 
       return body;
     };
-
-    const licenseGroup = createGroup(
-      "软件授权",
-      "Ed25519 本地验签；联网时登记设备，离线时仍可使用",
-      true,
-    );
-
-    const statusSetting = new Setting(licenseGroup)
-      .setName("当前激活状态")
-      .setDesc("正在验证授权状态...");
-
-    if (this.plugin.settings.licenseCode) {
-      void verifyLicenseCode(this.plugin.settings.licenseCode, "crisp-annotations").then((verifyRes) => {
-        if (verifyRes.valid && verifyRes.payload) {
-          statusSetting.setDesc(
-            `✅ 已激活（授权给: ${verifyRes.payload.userName}，到期时间: ${verifyRes.payload.expiresAt.split("T")[0]}）`,
-          );
-        } else {
-          statusSetting.setDesc(
-            `❌ 未激活（${verifyRes.reason || "授权码无效"}）`,
-          );
-        }
-      });
-    } else {
-      statusSetting.setDesc("❌ 未激活（尚未输入 Crisp 授权码）");
-    }
-
-    new Setting(licenseGroup)
-      .setName("输入授权码")
-      .setDesc("粘贴购买获取的 Crisp Suite 授权码完成激活。")
-      .addText((text) => text
-        .setPlaceholder("粘贴 Crisp 授权码...")
-        .setValue(this.plugin.settings.licenseCode)
-        .onChange(async (value) => {
-          this.plugin.settings.licenseCode = value.trim();
-          await this.plugin.saveSettings();
-        }))
-      .addButton((button) => button
-        .setButtonText("激活 / 重新验证")
-        .setCta()
-        .onClick(async () => {
-          const result = await verifyLicenseCode(this.plugin.settings.licenseCode, "crisp-annotations");
-          if (result.valid && result.payload) {
-            new Notice(`🎉 Crisp Annotations 激活成功！欢迎使用，${result.payload.userName}`);
-            this.display();
-          } else {
-            new Notice(`❌ 激活失败: ${result.reason}`);
-          }
-        }));
 
     const syncConditionalSettings = (): void => {
       customFontSetting?.settingEl.classList.toggle(

@@ -74,7 +74,6 @@ export interface CrispAnnotationsSettings {
   lastUsedColor: AnnotationColor;
   lastUsedMark: boolean;
   recallMode: boolean;
-  licenseCode: string;
 }
 
 export const DEFAULT_SETTINGS: CrispAnnotationsSettings = {
@@ -96,7 +95,6 @@ export const DEFAULT_SETTINGS: CrispAnnotationsSettings = {
   lastUsedColor: "amber",
   lastUsedMark: true,
   recallMode: false,
-  licenseCode: "",
 };
 
 export function normalizeHexColor(value: string): string | null {
@@ -178,8 +176,5 @@ export function normalizeSettings(value: unknown): CrispAnnotationsSettings {
     recallMode: typeof candidate.recallMode === "boolean"
       ? candidate.recallMode
       : DEFAULT_SETTINGS.recallMode,
-    licenseCode: typeof candidate.licenseCode === "string"
-      ? candidate.licenseCode.trim()
-      : "",
   };
 }
