@@ -502,6 +502,13 @@ export class AnnotationModal extends Modal {
       this.noteInput?.inputEl.focus();
       return;
     }
+    // Settings are applied before onSubmit persists them, and rolled back if the write is refused.
+    const previous = {
+      lastUsedPlace: this.settings.lastUsedPlace,
+      lastUsedColor: this.settings.lastUsedColor,
+      lastUsedMark: this.settings.lastUsedMark,
+      customColor: this.settings.customColor,
+    };
     if (this.settings.rememberLastChoice) {
       this.settings.lastUsedPlace = this.draft.place;
       this.settings.lastUsedColor = this.draft.color;
@@ -509,6 +516,7 @@ export class AnnotationModal extends Modal {
     }
     if (this.draft.color === "custom") this.settings.customColor = this.customColor;
     if (this.onSubmit({ ...this.draft, note }) === false) {
+      Object.assign(this.settings, previous);
       this.setError("文档已变化，未写入标注。请复制笔记后重新选择目标。");
       return;
     }

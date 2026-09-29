@@ -26,9 +26,10 @@ export class QuickAnnotationModal extends Modal {
     contentEl.empty();
     modalEl.addClass("crisp-ann-quick-modal");
 
+    const editing = this.initialSpec.note.length > 0;
     contentEl.createEl("h3", {
       cls: "crisp-ann-quick-modal__title",
-      text: "快速标注",
+      text: editing ? "编辑快速标注" : "快速标注",
     });
 
     contentEl.createDiv({
@@ -67,7 +68,7 @@ export class QuickAnnotationModal extends Modal {
 
     const submitBtn = footerEl.createEl("button", {
       cls: "mod-cta",
-      text: "添加笔记",
+      text: editing ? "保存修改" : "添加笔记",
     });
     submitBtn.addEventListener("click", () => this.submit());
 

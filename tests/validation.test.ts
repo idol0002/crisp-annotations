@@ -38,18 +38,28 @@ describe("validateAnnotationTarget", () => {
   it("still rejects untrimmed targets", () => {
     const result = validateAnnotationTarget(" hello ");
     expect(result.valid).toBe(false);
-    expect(result.error).toBe("Annotations must use trimmed text.");
+    expect(result.error).toBe("标注目标首尾不能有空白。");
   });
 
   it("still rejects == markers", () => {
     expect(validateAnnotationTarget("a==b").valid).toBe(false);
     expect(validateAnnotationTarget("a==b").error).toBe(
-      "Annotations must not contain == markers.",
+      "标注目标不能包含 == 高亮标记。",
     );
   });
 
   it("accepts multi-line targets", () => {
     expect(validateAnnotationTarget("line one\nline two").valid).toBe(true);
+  });
+
+  it("rejects targets whose written syntax could not be parsed back", () => {
+    expect(validateAnnotationTarget("a =").valid).toBe(false);
+    expect(validateAnnotationTarget("path\\").valid).toBe(false);
+  });
+
+  it("rejects targets spanning a paragraph break", () => {
+    expect(validateAnnotationTarget("para one\n\npara two").valid).toBe(false);
+    expect(validateAnnotationTarget("para one\n  \npara two").valid).toBe(false);
   });
 
   it("accepts trimmed single-line targets", () => {

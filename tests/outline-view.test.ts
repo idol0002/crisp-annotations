@@ -323,6 +323,52 @@ describe("CrispAnnotationsOutlineView", () => {
     expect(container.textContent).toContain("没有匹配的标注");
   });
 
+  it("keeps the same search input through IME composition", () => {
+    const container = createObsidianEl();
+    document.body.appendChild(container);
+    const view = new CrispAnnotationsOutlineView(makeDummyLeaf(), makeDummySettings);
+    Object.defineProperty(view, "containerEl", { value: container });
+    view.refreshVault([
+      vaultEntry("A.md", '==迁移=={ann note="复核"}'),
+      vaultEntry("B.md", '==发布=={ann note="检查"}'),
+    ]);
+    view.refresh("");
+    container.querySelectorAll<HTMLButtonElement>(
+      ".crisp-ann-outline-scope__button",
+    )[1].click();
+    const search = container.querySelector<HTMLInputElement>(
+      ".crisp-ann-outline-search__input",
+    );
+    if (!search) throw new Error("missing search input");
+
+    search.value = "fu";
+    search.dispatchEvent(new InputEvent("input", { isComposing: true }));
+    expect(container.querySelector(".crisp-ann-outline-search__input")).toBe(search);
+    expect(container.querySelectorAll(".crisp-ann-outline-item")).toHaveLength(2);
+
+    search.value = "复核";
+    search.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(container.querySelector(".crisp-ann-outline-search__input")).toBe(search);
+    expect(container.querySelectorAll(".crisp-ann-outline-item")).toHaveLength(1);
+  });
+
+  it("keeps the scroll position when a refresh rebuilds the list", () => {
+    const container = createObsidianEl();
+    document.body.appendChild(container);
+    const view = new CrispAnnotationsOutlineView(makeDummyLeaf(), makeDummySettings);
+    Object.defineProperty(view, "containerEl", { value: container });
+    view.refresh('==A=={ann note="one"} ==B=={ann note="two"}');
+    container.scrollTop = 120;
+
+    view.refresh('==A=={ann note="one!"} ==B=={ann note="two"}');
+    expect(container.scrollTop).toBe(120);
+
+    container.querySelectorAll<HTMLButtonElement>(
+      ".crisp-ann-outline-scope__button",
+    )[1].click();
+    expect(container.scrollTop).toBe(0);
+  });
+
   it("highlights the annotation nearest the reading viewport", () => {
     const container = createObsidianEl();
     const sourceLeaf = {

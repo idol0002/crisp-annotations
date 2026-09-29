@@ -100,8 +100,8 @@ describe("addAnnotationContextMenuItem", () => {
 
     expect(menu.items).toHaveLength(3);
     expect(menu.items[0].title).toBe("编辑标注");
-    expect(menu.items[1].title).toBe("Turn off target highlight");
-    expect(menu.items[2].title).toBe("Remove annotation");
+    expect(menu.items[1].title).toBe("关闭原文高亮");
+    expect(menu.items[2].title).toBe("删除标注");
 
     menu.items[2].click?.();
     expect(remove).toHaveBeenCalledWith(editor);

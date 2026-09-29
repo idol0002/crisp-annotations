@@ -5,13 +5,28 @@ export function validateAnnotationTarget(target: string): {
   if (target !== target.trim()) {
     return {
       valid: false,
-      error: "Annotations must use trimmed text.",
+      error: "标注目标首尾不能有空白。",
     };
   }
   if (target.includes("==")) {
     return {
       valid: false,
-      error: "Annotations must not contain == markers.",
+      error: "标注目标不能包含 == 高亮标记。",
+    };
+  }
+  // A trailing "=" merges into the closing "==", and a trailing "\" escapes it;
+  // either way the written syntax could never be read back as an annotation.
+  if (target.endsWith("=") || target.endsWith("\\")) {
+    return {
+      valid: false,
+      error: "标注目标不能以 = 或 \\ 结尾，请调整选区。",
+    };
+  }
+  // Highlights cannot span paragraphs, so Reading view would show raw syntax.
+  if (/\n[ \t]*\r?\n/.test(target)) {
+    return {
+      valid: false,
+      error: "标注目标不能跨越段落，请只选中同一段内的文字。",
     };
   }
   return { valid: true };

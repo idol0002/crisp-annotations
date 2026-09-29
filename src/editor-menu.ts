@@ -41,7 +41,7 @@ export function addAnnotationContextMenuItem<TEditor extends AnnotationEditor>(
     .onClick(() => open(editor)));
 
   if (existing && toggleHighlight) {
-    const highlightTitle = existing.spec.mark ? "Turn off target highlight" : "Turn on target highlight";
+    const highlightTitle = existing.spec.mark ? "关闭原文高亮" : "开启原文高亮";
     menu.addItem((item) => item
       .setTitle(highlightTitle)
       .setIcon("highlighter")
@@ -51,7 +51,7 @@ export function addAnnotationContextMenuItem<TEditor extends AnnotationEditor>(
 
   if (existing && remove) {
     menu.addItem((item) => item
-      .setTitle("Remove annotation")
+      .setTitle("删除标注")
       .setIcon("eraser")
       .setSection("action")
       .onClick(() => remove(editor)));

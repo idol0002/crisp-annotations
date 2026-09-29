@@ -161,3 +161,15 @@ it('keeps an edited note available when the document rejects the write', () => {
   expect(close).not.toHaveBeenCalled();
   expect(modal.contentEl.textContent).toContain('文档');
 });
+
+it('leaves global settings untouched when the document rejects the write', () => {
+  const settings = { ...DEFAULT_SETTINGS, rememberLastChoice: true, lastUsedPlace: 'bottom' as const, customColor: '#111111' };
+  const modal = new AnnotationModal({} as App, {note:'草稿',place:'right',color:'custom',mark:false}, false, settings, vi.fn(), () => false);
+  modal.onOpen();
+  const picker = modal.contentEl.querySelector<HTMLInputElement>('input[type="color"]')!;
+  picker.value = '#654321'; picker.dispatchEvent(new Event('input'));
+  modal.contentEl.querySelector<HTMLButtonElement>('.crisp-radio-btn--submit')!.click();
+  expect(settings.lastUsedPlace).toBe('bottom');
+  expect(settings.customColor).toBe('#111111');
+  modal.onClose();
+});

@@ -158,4 +158,50 @@ describe("renderAnnotationsInElement", () => {
     }));
     expect(edited).toEqual([wrapper]);
   });
+
+  it("renders notes whose escaped quotes were unescaped by Markdown", () => {
+    // Source: ==目标=={ann note="他说\"好\"" color=red}
+    document.body.innerHTML = '<p id="p"><mark>目标</mark>{ann note="他说"好"" color=red} 后文</p>';
+
+    expect(renderAnnotationsInElement(document.body)).toBe(1);
+    expect(document.querySelector(".crisp-ann__label")?.textContent).toBe('他说"好"');
+    expect(document.querySelector(".crisp-ann")?.classList.contains("crisp-ann--red")).toBe(true);
+    expect(document.querySelector("#p")?.textContent).toBe('目标他说"好" 后文');
+  });
+
+  it("renders notes that Markdown split into inline elements", () => {
+    document.body.innerHTML = [
+      '<p id="p"><mark>目标</mark>{ann note="看 <strong>重点</strong> 和 ',
+      '<code>code</code>" place=top} 后文</p>',
+    ].join("");
+
+    expect(renderAnnotationsInElement(document.body)).toBe(1);
+    expect(document.querySelector(".crisp-ann__label")?.textContent).toBe("看 重点 和 code");
+    expect(document.querySelector(".crisp-ann")?.classList.contains("crisp-ann--top")).toBe(true);
+    expect(document.querySelector("#p strong")).toBeNull();
+    expect(document.querySelector("#p")?.textContent).toBe("目标看 重点 和 code 后文");
+  });
+
+  it("renders notes whose closing brace was swallowed by an autolink", () => {
+    document.body.innerHTML = [
+      '<p id="p"><mark>目标</mark>{ann note="见 ',
+      '<a href="https://x.com/a%22%7D">https://x.com/a"}</a> 后文</p>',
+    ].join("");
+
+    expect(renderAnnotationsInElement(document.body)).toBe(1);
+    expect(document.querySelector(".crisp-ann__label")?.textContent).toBe("见 https://x.com/a");
+    expect(document.querySelector("#p a")).toBeNull();
+    expect(document.querySelector("#p")?.textContent).toBe("目标见 https://x.com/a 后文");
+  });
+
+  it("leaves unrelated marks and incomplete directives untouched", () => {
+    document.body.innerHTML = [
+      '<p id="a"><mark>plain</mark> {ann note="x"}</p>',
+      '<p id="b"><mark>open</mark>{ann note="never closed <em>x</em></p>',
+    ].join("");
+
+    expect(renderAnnotationsInElement(document.body)).toBe(0);
+    expect(document.querySelector("#b em")).not.toBeNull();
+    expect(document.querySelectorAll(".crisp-ann")).toHaveLength(0);
+  });
 });

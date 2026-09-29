@@ -85,6 +85,7 @@ import {
   type AnnotationNavigationDirection,
 } from "./annotation-navigation";
 import { findClosestVisibleAnnotationIndex } from "./reading-position";
+import { formatAnnotationsSummary } from "./export-summary";
 
 interface ReadingSourceIndex {
   annotations: AnnotationMatch[];
@@ -254,7 +255,17 @@ export default class CrispAnnotationsPlugin extends Plugin {
     this.addCommand({
       id: "export-annotations-summary",
       name: "Export annotations summary to clipboard (导出标注汇总)",
-      editorCallback: (editor) => this.exportAnnotationsSummary(editor),
+      // Read-only, so it also works from Reading view where editor commands are hidden.
+      checkCallback: (checking) => {
+        const context = this.getMarkdownContext(this.app.workspace.activeLeaf);
+        if (!context || context.leaf !== this.app.workspace.activeLeaf) {
+          return false;
+        }
+        if (!checking) {
+          this.exportAnnotationsSummary(context.source);
+        }
+        return true;
+      },
     });
     this.addCommand({
       id: "toggle-active-recall-mode",
@@ -295,6 +306,19 @@ export default class CrispAnnotationsPlugin extends Plugin {
         return;
       }
       this.refreshOutlineViews();
+    }));
+
+    // Opening another file inside the same tab does not change the active leaf.
+    this.registerEvent(this.app.workspace.on("file-open", () => {
+      this.cancelOutlineRefresh();
+      this.outlineRefreshTimer = setTimeout(() => {
+        this.outlineRefreshTimer = null;
+        const context = this.getMarkdownContext(this.app.workspace.activeLeaf);
+        if (context) {
+          this.lastMarkdownLeaf = context.leaf;
+          this.refreshOutlineViews(context.source, context.leaf);
+        }
+      }, 0);
     }));
 
     this.registerEvent(this.app.workspace.on("editor-change", (editor, info) => {
@@ -1103,24 +1127,13 @@ export default class CrispAnnotationsPlugin extends Plugin {
     }
   }
 
-  private exportAnnotationsSummary(editor: Editor): void {
-    const source = editor.getValue();
+  private exportAnnotationsSummary(source: string): void {
     const matches = findAnnotations(source);
     if (matches.length === 0) {
       new Notice("当前文档中没有 Crisp 标注。");
       return;
     }
-    const lines = [
-      `# Crisp Annotations Summary (${matches.length})`,
-      "",
-      ...matches.map((match, index) => {
-        const { target, spec } = match;
-        const color = spec.color !== "neutral" ? ` [${spec.color}]` : "";
-        const place = spec.place ? ` (${spec.place})` : "";
-        return `${index + 1}. **${target}**${color}${place}: ${spec.note}`;
-      }),
-    ];
-    const text = lines.join("\n");
+    const text = formatAnnotationsSummary(matches);
     void navigator.clipboard.writeText(text).then(
       () => new Notice(`已复制 ${matches.length} 条标注到剪贴板！`),
       () => new Notice("复制标注到剪贴板失败。"),
@@ -1192,7 +1205,7 @@ class CrispAnnotationsSettingTab extends PluginSettingTab {
 
     const licenseGroup = createGroup(
       "软件授权",
-      "纯离线 Ed25519 密钥激活验证",
+      "Ed25519 本地验签；联网时登记设备，离线时仍可使用",
       true,
     );
 
@@ -1218,7 +1231,7 @@ class CrispAnnotationsSettingTab extends PluginSettingTab {
 
     new Setting(licenseGroup)
       .setName("输入授权码")
-      .setDesc("粘贴购买获取的 Crisp Suite 授权字符串进行离线激活。")
+      .setDesc("粘贴购买获取的 Crisp Suite 授权码完成激活。")
       .addText((text) => text
         .setPlaceholder("粘贴 Crisp 授权码...")
         .setValue(this.plugin.settings.licenseCode)

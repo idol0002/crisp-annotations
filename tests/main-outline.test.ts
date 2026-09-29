@@ -697,6 +697,30 @@ describe("annotation outline lifecycle", () => {
   });
 });
 
+it("refreshes the outline when another file opens in the same tab", async () => {
+  vi.useFakeTimers();
+  try {
+    const { app, markdownLeaf, listeners } = createWorkspace();
+    const plugin = new CrispAnnotationsPlugin(app, { id: "crisp-annotations" } as never);
+    plugin.app = app;
+    await plugin.onload();
+    const refresh = vi.spyOn(
+      plugin as unknown as {
+        refreshOutlineViews(source?: string, leaf?: WorkspaceLeaf): void;
+      },
+      "refreshOutlineViews",
+    );
+
+    listeners.get("file-open")?.();
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenLastCalledWith(SOURCE, markdownLeaf);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it('refuses modal writes after the source changes while the dialog is open', async () => {
   const { app, markdownLeaf, getSource } = createWorkspace();
   const plugin = new CrispAnnotationsPlugin(app, { id: 'crisp-annotations' } as never);

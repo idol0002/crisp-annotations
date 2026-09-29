@@ -83,9 +83,79 @@ export function resetAnnotationMaskState(
 
 export type ReadingAnnotationEditHandler = (
   wrapper: HTMLElement,
-  annotation: ReturnType<typeof findAnnotations>[number],
+  annotation: RenderedDirective,
   renderedIndex: number,
 ) => void;
+
+export interface RenderedDirective {
+  length: number;
+  spec: ReturnType<typeof findAnnotations>[number]["spec"];
+}
+
+// Markdown rendering drops backslash escapes and turns markup inside the note
+// (**bold**, `code`, links, tags) into elements, so the directive can arrive as
+// several nodes whose text no longer matches the stored syntax exactly.
+const RENDERED_DIRECTIVE_PATTERN = /^\{ann\s+note="([\s\S]*?)"((?:\s+(?:place|color|mark)=[a-z-]+)*)\s*\}/;
+const RENDERED_DIRECTIVE_MAX_NODES = 24;
+const RENDERED_DIRECTIVE_MAX_LENGTH = 4000;
+
+function parseDirective(text: string): RenderedDirective | null {
+  const annotation = findAnnotations(`==x==${text}`)[0];
+  if (annotation && annotation.from === 0 && annotation.target === "x") {
+    return {
+      length: annotation.directiveTo - annotation.directiveFrom,
+      spec: annotation.spec,
+    };
+  }
+  const rendered = RENDERED_DIRECTIVE_PATTERN.exec(text);
+  if (!rendered || rendered[1].trim().length === 0) {
+    return null;
+  }
+  const escapedNote = rendered[1].replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const probe = findAnnotations(`==x=={ann note="${escapedNote}"${rendered[2]}}`)[0];
+  if (!probe) {
+    return null;
+  }
+  return {
+    length: rendered[0].length,
+    spec: { ...probe.spec, note: rendered[1] },
+  };
+}
+
+// Returns the sibling nodes holding the directive and how many characters of
+// the last one belong to it, or null when the directive cannot be isolated.
+function collectDirective(first: Node): {
+  directive: RenderedDirective;
+  nodes: Node[];
+  tailLength: number;
+} | null {
+  const nodes: Node[] = [];
+  let text = "";
+  for (
+    let node: Node | null = first;
+    node && nodes.length < RENDERED_DIRECTIVE_MAX_NODES;
+    node = node.nextSibling
+  ) {
+    nodes.push(node);
+    text += node.textContent ?? "";
+    if (text.length > RENDERED_DIRECTIVE_MAX_LENGTH) {
+      return null;
+    }
+    const directive = parseDirective(text);
+    if (!directive) {
+      continue;
+    }
+    const lastNode = nodes[nodes.length - 1];
+    const tailLength = directive.length
+      - (text.length - (lastNode.textContent ?? "").length);
+    // A directive ending inside an element (not a text node) cannot be split cleanly.
+    if (tailLength < (lastNode.textContent ?? "").length && lastNode.nodeType !== 3) {
+      return null;
+    }
+    return { directive, nodes, tailLength };
+  }
+  return null;
+}
 
 export function renderAnnotationsInElement(
   root: HTMLElement,
@@ -98,14 +168,18 @@ export function renderAnnotationsInElement(
       continue;
     }
     const directiveNode = mark.nextSibling;
-    if (!directiveNode || directiveNode.nodeType !== 3) {
+    if (
+      !directiveNode
+      || directiveNode.nodeType !== 3
+      || !(directiveNode.textContent ?? "").startsWith("{ann")
+    ) {
       continue;
     }
-    const probePrefix = "==x==";
-    const annotation = findAnnotations(`${probePrefix}${directiveNode.textContent ?? ""}`)[0];
-    if (!annotation || annotation.from !== 0 || annotation.target !== "x") {
+    const collected = collectDirective(directiveNode);
+    if (!collected) {
       continue;
     }
+    const annotation = collected.directive;
 
     const renderedIndex = rendered;
     const ownerDocument = mark.ownerDocument;
@@ -178,11 +252,18 @@ export function renderAnnotationsInElement(
     mark.classList.add("crisp-ann__target");
     mark.setAttribute("aria-describedby", label.id);
 
-    const directiveLength = annotation.directiveTo - annotation.directiveFrom;
-    const textNode = directiveNode as Text;
-    textNode.data = textNode.data.slice(directiveLength);
-    if (textNode.data.length === 0) {
-      textNode.remove();
+    const lastNode = collected.nodes[collected.nodes.length - 1];
+    for (const node of collected.nodes.slice(0, -1)) {
+      node.parentNode?.removeChild(node);
+    }
+    if (lastNode.nodeType === 3) {
+      const textNode = lastNode as Text;
+      textNode.data = textNode.data.slice(collected.tailLength);
+      if (textNode.data.length === 0) {
+        textNode.remove();
+      }
+    } else {
+      lastNode.parentNode?.removeChild(lastNode);
     }
     rendered += 1;
   }

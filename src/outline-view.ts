@@ -64,6 +64,7 @@ export class CrispAnnotationsOutlineView extends ItemView {
   private colorFilter: VaultAnnotationColorFilter = "all";
   private vaultLoading = false;
   private activeAnnotation: { filePath: string; from: number } | null = null;
+  private renderedScope: "current" | "vault" | null = null;
   private readonly settingsProvider: () => CrispAnnotationsSettings;
 
   constructor(
@@ -161,8 +162,16 @@ export class CrispAnnotationsOutlineView extends ItemView {
     }
   }
 
-  private render(restoreSearchFocus = false): void {
+  private render(): void {
     const container = this.containerEl;
+    // Refreshes arrive on every edit; keep the reader's place unless the scope changed.
+    const scrollTop = this.renderedScope === this.outlineScope ? container.scrollTop : 0;
+    this.renderedScope = this.outlineScope;
+    this.renderContent(container);
+    container.scrollTop = scrollTop;
+  }
+
+  private renderContent(container: HTMLElement): void {
     container.empty();
 
     const scope = container.createDiv({
@@ -188,7 +197,7 @@ export class CrispAnnotationsOutlineView extends ItemView {
     }
 
     if (this.outlineScope === "vault") {
-      this.renderVaultContent(container, restoreSearchFocus);
+      this.renderVaultContent(container);
       return;
     }
 
@@ -218,10 +227,7 @@ export class CrispAnnotationsOutlineView extends ItemView {
     }
   }
 
-  private renderVaultContent(
-    container: HTMLElement,
-    restoreSearchFocus: boolean,
-  ): void {
+  private renderVaultContent(container: HTMLElement): void {
     const toolbar = container.createDiv({
       cls: "crisp-ann-outline-search",
     });
@@ -231,15 +237,18 @@ export class CrispAnnotationsOutlineView extends ItemView {
     search.placeholder = "搜索原文、标注或文件…";
     search.setAttribute("aria-label", "搜索全库标注");
     search.value = this.searchQuery;
-    search.addEventListener("input", () => {
+    // Only the result list is rebuilt, so the input keeps focus and IME composition.
+    search.addEventListener("input", (event) => {
       this.searchQuery = search.value;
-      this.render(true);
+      if (!(event as InputEvent).isComposing) {
+        this.renderVaultResults(results);
+      }
+    });
+    search.addEventListener("compositionend", () => {
+      this.searchQuery = search.value;
+      this.renderVaultResults(results);
     });
     toolbar.appendChild(search);
-    if (restoreSearchFocus) {
-      search.focus();
-      search.setSelectionRange(search.value.length, search.value.length);
-    }
 
     const color = toolbar.ownerDocument.createElement("select");
     color.className = "crisp-ann-outline-search__color dropdown";
@@ -253,10 +262,18 @@ export class CrispAnnotationsOutlineView extends ItemView {
     }
     color.addEventListener("change", () => {
       this.colorFilter = color.value as VaultAnnotationColorFilter;
-      this.render();
+      this.renderVaultResults(results);
     });
     toolbar.appendChild(color);
 
+    const results = container.createDiv({
+      cls: "crisp-ann-outline-results",
+    });
+    this.renderVaultResults(results);
+  }
+
+  private renderVaultResults(container: HTMLElement): void {
+    container.empty();
     const entries = filterVaultAnnotationEntries(
       this.vaultAnnotations,
       this.searchQuery,

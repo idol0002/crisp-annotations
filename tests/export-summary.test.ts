@@ -1,27 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { findAnnotations } from "../src/annotation-syntax";
+import { formatAnnotationsSummary } from "../src/export-summary";
 
-describe("export annotations summary helper", () => {
-  it("formats multiple annotations into markdown summary lines", () => {
-    const source = `
-Here is a note with ==first annotation=={ann note="Check this out" place=top-right color=red}
-And another ==second annotation=={ann note="Important detail" color=blue mark=off}
-    `;
-    const matches = findAnnotations(source);
-    expect(matches).toHaveLength(2);
+describe("formatAnnotationsSummary", () => {
+  it("formats annotations with Chinese color and place labels", () => {
+    const source = [
+      'Here is ==first annotation=={ann note="Check this out" place=top-right color=red}',
+      'And ==second\nannotation=={ann note="Important detail" color=blue mark=off}',
+      'Plain ==third=={ann note="默认"}',
+    ].join("\n");
 
-    const lines = [
-      `# Crisp Annotations Summary (${matches.length})`,
+    expect(formatAnnotationsSummary(findAnnotations(source)).split("\n")).toEqual([
+      "# Crisp 标注汇总（3）",
       "",
-      ...matches.map((match, index) => {
-        const { target, spec } = match;
-        const color = spec.color !== "neutral" ? ` [${spec.color}]` : "";
-        const place = spec.place ? ` (${spec.place})` : "";
-        return `${index + 1}. **${target}**${color}${place}: ${spec.note}`;
-      }),
-    ];
-
-    expect(lines[2]).toBe("1. **first annotation** [red] (top-right): Check this out");
-    expect(lines[3]).toBe("2. **second annotation** [blue] (bottom): Important detail");
+      "1. **first annotation**（红色 · 右上方）：Check this out",
+      "2. **second annotation**（蓝色 · 下方 · 无高亮）：Important detail",
+      "3. **third**（中性 · 下方）：默认",
+    ]);
   });
 });
