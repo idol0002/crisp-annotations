@@ -9,6 +9,7 @@ import {
   type TFile,
   type WorkspaceLeaf,
 } from "obsidian";
+import { preserveUnreadableData } from "./data-safety";
 import { AnnotationModal } from "./annotation-modal";
 import { QuickAnnotationModal } from "./quick-annotation-modal";
 import {
@@ -94,6 +95,27 @@ interface ReadingSourceIndex {
 }
 
 export default class CrispAnnotationsPlugin extends Plugin {
+
+  private dataWriteBlocked = false;
+
+  // Never overwrite a data.json that could not be read and could not be backed up either.
+  async saveData(data: unknown): Promise<void> {
+    if (this.dataWriteBlocked) return;
+    await super.saveData(data);
+  }
+
+  // loadData() yields undefined when data.json exists but cannot be read; keep a copy before defaults take over.
+  private async protectUnreadableData(raw: unknown): Promise<void> {
+    if (raw !== undefined) return;
+    const result = await preserveUnreadableData(this.app.vault.adapter, `${this.manifest.dir}/data.json`);
+    if (result.state === "preserved") {
+      new Notice(`Crisp Annotations 的设置文件无法读取，已备份为 ${result.backupPath.split("/").pop()} 并恢复默认设置。`, 12000);
+    } else if (result.state === "failed") {
+      this.dataWriteBlocked = true;
+      console.error("Crisp Annotations could not back up unreadable data.json", result.error);
+      new Notice("Crisp Annotations 的设置文件无法读取，也无法备份。为保护原文件，本次运行不会保存设置。", 0);
+    }
+  }
   settings: CrispAnnotationsSettings = { ...DEFAULT_SETTINGS };
   private readonly appearanceDocuments = new Set<Document>();
   private readonly marginLayout = new MarginLayoutManager(() => this.settings);
@@ -109,7 +131,9 @@ export default class CrispAnnotationsPlugin extends Plugin {
 
   async onload(): Promise<void> {
     registerIcons();
-    this.settings = normalizeSettings(await this.loadData());
+    const stored: unknown = await this.loadData();
+    await this.protectUnreadableData(stored);
+    this.settings = normalizeSettings(stored);
     this.vaultAnnotationIndex = new VaultAnnotationIndex(async (file) => {
       const vaultFile = this.app.vault.getFileByPath(file.path);
       if (!vaultFile) {
