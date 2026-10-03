@@ -308,6 +308,53 @@ function buildMarginArrowHead(side: MarginSide, target: ConnectorPoint): string 
   ].join(" ");
 }
 
+const INLINE_LABEL_INSET = 8;
+
+interface HorizontalBounds {
+  left: number;
+  right: number;
+}
+
+// Horizontal shift that keeps an inline label inside the reading view.
+export function inlineLabelShift(
+  label: HorizontalBounds,
+  bounds: HorizontalBounds,
+  inset: number,
+): number {
+  const minLeft = bounds.left + inset;
+  const maxRight = bounds.right - inset;
+  if (label.right - label.left > maxRight - minLeft || label.left < minLeft) {
+    return minLeft - label.left;
+  }
+  if (label.right > maxRight) {
+    return maxRight - label.right;
+  }
+  return 0;
+}
+
+// Notes placed near a line's edge would be clipped on phones and narrow panes;
+// nudge the label (not the arrow) back inside while keeping its rotation.
+function fitInlineLabels(sizer: HTMLElement, view: HTMLElement): void {
+  const viewRect = view.getBoundingClientRect();
+  if (viewRect.width <= 0) {
+    return;
+  }
+  for (const wrapper of sizer.querySelectorAll<HTMLElement>(".crisp-ann")) {
+    if (wrapper.classList.contains("crisp-ann--margin")) {
+      continue;
+    }
+    const label = wrapper.querySelector<HTMLElement>(":scope > .crisp-ann__label");
+    if (!label) {
+      continue;
+    }
+    label.style.removeProperty("translate");
+    const shift = inlineLabelShift(label.getBoundingClientRect(), viewRect, INLINE_LABEL_INSET);
+    if (Math.abs(shift) >= 1) {
+      label.style.setProperty("translate", `${Math.round(shift)}px 0`);
+    }
+  }
+}
+
 function annotationPlace(wrapper: HTMLElement): AnnotationPlace {
   return ANNOTATION_PLACES.find((place) => (
     wrapper.classList.contains(`crisp-ann--${place}`)
@@ -374,6 +421,7 @@ function restoreSizer(sizer: HTMLElement, inline: boolean): void {
       "right",
       "top",
       "transform",
+      "translate",
       "visibility",
       "width",
     ]) {
@@ -585,7 +633,11 @@ export class MarginLayoutManager {
     const view = sizer.closest<HTMLElement>(".markdown-preview-view");
     const mobile = sizer.ownerDocument.body.classList.contains("is-mobile");
     restoreSizer(sizer, settings.annotationLayout === "inline" || mobile);
-    if (!view || mobile || settings.annotationLayout === "inline") {
+    if (!view) {
+      return;
+    }
+    if (mobile || settings.annotationLayout === "inline") {
+      fitInlineLabels(sizer, view);
       return;
     }
 
@@ -666,6 +718,7 @@ export class MarginLayoutManager {
       sizer,
       (wrapper) => !wrapper.classList.contains("crisp-ann--margin"),
     );
+    fitInlineLabels(sizer, view);
 
     const documentHeight = Math.max(sizer.scrollHeight, Math.ceil(sizerRect.height));
     for (const side of ["left", "right"] as const) {

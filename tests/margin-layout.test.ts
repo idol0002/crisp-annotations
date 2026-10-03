@@ -4,6 +4,7 @@ import {
   buildMarginConnectorPath,
   chooseMarginSide,
   distributeMarginNotes,
+  inlineLabelShift,
   MarginLayoutManager,
   recalculateBlockSpacing,
 } from "../src/margin-layout";
@@ -318,5 +319,25 @@ describe("MarginLayoutManager dispose safety", () => {
 
     expect(sizer.querySelectorAll(".crisp-ann-margin-connectors")).toHaveLength(0);
     view.remove();
+  });
+});
+
+describe("inlineLabelShift", () => {
+  const bounds = { left: 0, right: 390 };
+
+  it("leaves labels that already fit untouched", () => {
+    expect(inlineLabelShift({ left: 100, right: 250 }, bounds, 8)).toBe(0);
+  });
+
+  it("pulls a label back from the left edge", () => {
+    expect(inlineLabelShift({ left: -37, right: 113 }, bounds, 8)).toBe(45);
+  });
+
+  it("pulls a label back from the right edge", () => {
+    expect(inlineLabelShift({ left: 300, right: 436 }, bounds, 8)).toBe(-54);
+  });
+
+  it("aligns a label wider than the view to the left edge", () => {
+    expect(inlineLabelShift({ left: -50, right: 400 }, { left: 0, right: 300 }, 8)).toBe(58);
   });
 });

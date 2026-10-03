@@ -77,10 +77,20 @@ describe("plugin styles", () => {
     }
   });
 
-  it("uses the safe bottom layout on Obsidian mobile at every viewport width", () => {
-    expect(styles).toContain("body.is-mobile .crisp-ann::before");
-    expect(styles).toContain("body.is-mobile .crisp-ann > .crisp-ann__label");
-    expect(styles).toContain("body.is-mobile .crisp-ann-block--space-top");
+  it("keeps the chosen direction on mobile and narrow screens", () => {
+    // A blanket rule here would pin every note below its target, whatever place was chosen.
+    expect(styles).not.toMatch(/body\.is-mobile \.crisp-ann::before/);
+    expect(styles).not.toMatch(/body\.is-mobile \.crisp-ann > \.crisp-ann__label/);
+    const narrow = styles.match(/@media \(max-width: 700px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(narrow).not.toMatch(/\n {2}\.crisp-ann::before/);
+    expect(narrow).not.toMatch(/\n {2}\.crisp-ann > \.crisp-ann__label/);
+    // Only pure left/right fold under their own side, using the diagonal arrows.
+    for (const prefix of ["body.is-mobile ", "  "]) {
+      expect(styles).toContain(`${prefix}.crisp-ann--left::before`);
+      expect(styles).toContain(`${prefix}.crisp-ann--right::before`);
+    }
+    expect(narrow).toContain("var(--crisp-ann-arrow-mask-bottom-left,");
+    expect(narrow).toContain("var(--crisp-ann-arrow-mask-bottom-right,");
   });
 
   it("provides scoped margin notes and an inline fallback", () => {
